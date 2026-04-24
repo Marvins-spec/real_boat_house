@@ -146,6 +146,17 @@ export async function saveSetMeal(
   name: string,
   slots: { category: string; quantity: number }[]
 ): Promise<string> {
+  const normalizedSlots = (() => {
+    const byCategory = new Map<string, number>();
+    for (const slot of slots) {
+      const category = slot.category?.trim();
+      const quantity = Number(slot.quantity);
+      if (!category || quantity <= 0) continue;
+      byCategory.set(category, (byCategory.get(category) ?? 0) + quantity);
+    }
+    return [...byCategory.entries()].map(([category, quantity]) => ({ category, quantity }));
+  })();
+
   if (!isSupabaseConfigured()) {
     const id = setId ?? `set-${uuidv4()}`;
     if (!setId) mockSetMeals.push({ id, name });
@@ -154,7 +165,7 @@ export async function saveSetMeal(
     for (let i = mockSetMealSlots.length - 1; i >= 0; i -= 1) {
       if (mockSetMealSlots[i].setId === id) mockSetMealSlots.splice(i, 1);
     }
-    for (const slot of slots) {
+    for (const slot of normalizedSlots) {
       mockSetMealSlots.push({
         id: `set-slot-${uuidv4()}`,
         setId: id,
@@ -203,9 +214,9 @@ export async function saveSetMeal(
     if (deleteExistingError) throw deleteExistingError;
   }
 
-  if (slots.length) {
+  if (normalizedSlots.length) {
     const { error: insertItemsError } = await supabase.from("set_meal_slots").insert(
-      slots.map((slot) => ({
+      normalizedSlots.map((slot) => ({
         id: uuidv4(),
         set_id: nextSetId,
         category: slot.category,
