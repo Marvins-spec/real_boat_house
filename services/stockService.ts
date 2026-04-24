@@ -482,4 +482,36 @@ export const stockService = {
     if (error) throw error;
     return fetchIngredientsFromDb();
   },
+
+  async saveMenuRecipe(
+    menuItemId: string,
+    recipe: RecipeIngredient[]
+  ): Promise<void> {
+    if (!isSupabaseConfigured()) {
+      const target = mockMenuItems.find((m) => m.id === menuItemId);
+      if (target) {
+        target.recipe = recipe.map((r) => ({ ...r }));
+      }
+      return;
+    }
+
+    const supabase = getSupabaseOrThrow();
+    const { error: deleteError } = await supabase
+      .from("recipes")
+      .delete()
+      .eq("menu_item_id", menuItemId);
+    if (deleteError) throw deleteError;
+
+    if (!recipe.length) return;
+
+    const { error: insertError } = await supabase.from("recipes").insert(
+      recipe.map((r) => ({
+        id: uuidv4(),
+        menu_item_id: menuItemId,
+        ingredient_id: r.ingredientId,
+        amount: r.quantity,
+      }))
+    );
+    if (insertError) throw insertError;
+  },
 };
