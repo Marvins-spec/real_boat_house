@@ -42,6 +42,7 @@ interface AppState {
   updateMenuItem: (menuItemId: string, updates: Partial<MenuItem>) => void;
   addMenuItem: (menuItem: Omit<MenuItem, "id">) => void;
   deleteMenuItem: (menuItemId: string) => void;
+  saveMenuRecipe: (menuItemId: string, recipe: { ingredientId: string; quantity: number }[]) => Promise<void>;
   saveSetMeal: (
     setId: string | null,
     name: string,
@@ -261,6 +262,15 @@ export const useStore = create<AppState>((set, get) => ({
       set({
         baseMenu: base,
         menuItems: stockService.markMenuAvailability(base, get().ingredients),
+      });
+    },
+
+    saveMenuRecipe: async (menuItemId, recipe) => {
+      await stockService.saveMenuRecipe(menuItemId, recipe);
+      const latestMenu = await stockService.fetchMenuItems();
+      set({
+        baseMenu: latestMenu,
+        menuItems: stockService.markMenuAvailability(latestMenu, get().ingredients),
       });
     },
 
