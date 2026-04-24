@@ -169,12 +169,28 @@ export async function saveSetMeal(
   let nextSetId = setId;
   if (!nextSetId) {
     nextSetId = uuidv4();
+    // `set_meals.id` references `menu_items.id`, so create menu_items row first.
+    const { error: insertMenuItemError } = await supabase.from("menu_items").insert({
+      id: nextSetId,
+      name,
+      category: "set",
+      description: "",
+      price: 0,
+    });
+    if (insertMenuItemError) throw insertMenuItemError;
+
     const { error: insertSetError } = await supabase.from("set_meals").insert({
       id: nextSetId,
       name,
     });
     if (insertSetError) throw insertSetError;
   } else {
+    const { error: updateMenuItemError } = await supabase
+      .from("menu_items")
+      .update({ name, category: "set" })
+      .eq("id", nextSetId);
+    if (updateMenuItemError) throw updateMenuItemError;
+
     const { error: updateSetError } = await supabase
       .from("set_meals")
       .update({ name })
@@ -213,8 +229,15 @@ export async function deleteSetMeal(setId: string): Promise<void> {
     return;
   }
   const supabase = getSupabaseOrThrow();
-  const { error } = await supabase.from("set_meals").delete().eq("id", setId);
-  if (error) throw error;
+  const { error: deleteSetError } = await supabase.from("set_meals").delete().eq("id", setId);
+  if (deleteSetError) throw deleteSetError;
+  // Keep menu_items clean after removing set metadata.
+  const { error: deleteMenuItemError } = await supabase
+    .from("menu_items")
+    .delete()
+    .eq("id", setId)
+    .eq("category", "set");
+  if (deleteMenuItemError) throw deleteMenuItemError;
 }
 
 export async function fetchMenuItemsFromDb(
