@@ -54,6 +54,7 @@ import {
   DollarSign,
   ShoppingCart,
   TrendingUp,
+  BookOpen,
 } from "lucide-react";
 import { Ingredient, MenuItem, MenuCategory } from "@/types";
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
@@ -76,6 +77,7 @@ export default function AdminPage() {
     addMenuItem,
     updateMenuItem,
     deleteMenuItem,
+    saveMenuRecipe,
     saveSetMeal,
     deleteSetMeal,
     resetSalesData,
@@ -88,6 +90,9 @@ export default function AdminPage() {
   const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
   const [isAddingSetMeal, setIsAddingSetMeal] = useState(false);
   const [editingSetMeal, setEditingSetMeal] = useState<MenuItem | null>(null);
+  const [isEditingRecipe, setIsEditingRecipe] = useState(false);
+  const [editingRecipeMenuItem, setEditingRecipeMenuItem] = useState<MenuItem | null>(null);
+  const [recipeRows, setRecipeRows] = useState<Array<{ ingredientId: string; quantity: number }>>([]);
 
   // Ingredient form state
   const [ingredientForm, setIngredientForm] = useState({
@@ -184,6 +189,23 @@ export default function AdminPage() {
     setEditingSetMeal(null);
     setSetMealName("");
     setSetMealSlots([]);
+  };
+
+  const openEditRecipe = (item: MenuItem) => {
+    setEditingRecipeMenuItem(item);
+    setRecipeRows(item.recipe.map((r) => ({ ingredientId: r.ingredientId, quantity: r.quantity })));
+    setIsEditingRecipe(true);
+  };
+
+  const handleSaveRecipe = async () => {
+    if (!editingRecipeMenuItem) return;
+    const normalized = recipeRows
+      .filter((r) => r.ingredientId && r.quantity > 0)
+      .map((r) => ({ ingredientId: r.ingredientId, quantity: r.quantity }));
+    await saveMenuRecipe(editingRecipeMenuItem.id, normalized);
+    setIsEditingRecipe(false);
+    setEditingRecipeMenuItem(null);
+    setRecipeRows([]);
   };
 
   if (posLoading) {
@@ -670,6 +692,81 @@ export default function AdminPage() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
+                <Dialog open={isEditingRecipe} onOpenChange={setIsEditingRecipe}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>
+                        Edit Recipe {editingRecipeMenuItem ? `- ${editingRecipeMenuItem.name}` : ""}
+                      </DialogTitle>
+                    </DialogHeader>
+                    <FieldGroup className="py-4">
+                      {recipeRows.map((row, idx) => (
+                        <div key={`recipe-row-${idx}`} className="grid grid-cols-[1fr_120px_40px] gap-2">
+                          <Select
+                            value={row.ingredientId}
+                            onValueChange={(v) =>
+                              setRecipeRows((prev) =>
+                                prev.map((r, i) => (i === idx ? { ...r, ingredientId: v } : r))
+                              )
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select ingredient" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ingredients.map((ing) => (
+                                <SelectItem key={ing.id} value={ing.id}>
+                                  {ing.name} ({ing.unit})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={row.quantity}
+                            onChange={(e) =>
+                              setRecipeRows((prev) =>
+                                prev.map((r, i) =>
+                                  i === idx ? { ...r, quantity: Number(e.target.value) || 0 } : r
+                                )
+                              )
+                            }
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setRecipeRows((prev) => prev.filter((_, i) => i !== idx))}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          setRecipeRows((prev) => [
+                            ...prev,
+                            { ingredientId: ingredients[0]?.id ?? "", quantity: 0 },
+                          ])
+                        }
+                      >
+                        Add Ingredient
+                      </Button>
+                    </FieldGroup>
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button variant="outline">Cancel</Button>
+                      </DialogClose>
+                      <Button onClick={() => void handleSaveRecipe()}>
+                        Save Recipe
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
@@ -755,6 +852,15 @@ export default function AdminPage() {
                               onClick={() => openEditMenuItem(item)}
                             >
                               <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openEditRecipe(item)}
+                              title="Edit recipe"
+                            >
+                              <BookOpen className="h-4 w-4" />
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
